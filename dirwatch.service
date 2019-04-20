@@ -1,0 +1,10 @@
+[Unit]
+Description="Simple photo organizer"
+Wants=dirwatch.timer
+
+[Service]
+Type=oneshot
+User=tempdir
+Group=photo
+ExecStart=/usr/bin/dirwatch.sh
+

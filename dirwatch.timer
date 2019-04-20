@@ -1,0 +1,10 @@
+[Unit]
+Description="Photo organizer periodic timer"
+WantedBy=dirwatch.service
+
+[Timer]
+OnCalendar=*-*-* *:43:00
+Persistent=false
+
+[Install]
+WantedBy=timer.target

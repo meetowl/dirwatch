@@ -1,0 +1,17 @@
+# Configuration file for dirwatch
+## Directory to sort files from
+watch_dir=
+
+## Directory to sort files into
+move_to_dir=
+
+## Location of log and error warning files
+log=
+error_warn=
+
+## Interval for checking watch_dir
+interval=
+
+## User and group ownership
+own_user=
+own_group=
