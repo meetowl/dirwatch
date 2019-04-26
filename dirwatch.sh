@@ -2,9 +2,7 @@
 # Watches a directory, copies to another if a file exists
 # Originally meant for photo storage
 
-# TODO add command flags like proper --now support, --no-log, etc.
 # TODO create an install.sh file (interactive and not)
-# TODO add status command
 # TODO more verbose move / cp checking.
 # TODO add ability to control fate of duplicates
 
@@ -82,23 +80,30 @@ function detect_new_file(){
 # Contains all ways I thought of to get the creation date
 function get_date_of_file(){
 	# YYYYMMDD
-	date_of_file=`echo $1 | 
-	sed -n -E 's/.*(20[0-9]{2}[0-2][0-9][0-3][0-9]).*/\1/p'`
+	date_of_file=$(echo $1 | 
+	sed -n -E 's/.*(20[0-9]{2}[0-2][0-9][0-3][0-9]).*/\1/p')
 
 
 	# YYYY-MM-DD
 	if [[ -z $date_of_file ]]
 	then
-	   date_of_file=`echo $1 | 
-	   sed -n -E 's/.*(20[0-9]{2}-[0-2][0-9]-[0-3][0-9]).*/\1/p'`		
+	   date_of_file=$(echo $1 | 
+	   sed -n -E 's/.*(20[0-9]{2}-[0-2][0-9]-[0-3][0-9]).*/\1/p')		
 	fi
 
 	# Stat command output
 	if [[ -z $date_of_file ]]
 	then
-		date_of_file=`stat $1 |
-		sed -n -E 's/Modify: (20[0-9]{2}-[0-1][0-9]-[0-3][0-9]).*/\1/p'`
+		date_of_file=$(stat "$1" |
+		sed -n -E 's/Modify: (20[0-9]{2}-[0-1][0-9]-[0-3][0-9]).*/\1/p')
 	fi
+
+	if [[ -z $date_of_file ]]
+	then
+		print_to_error "error: unable to find date of $1."
+		exit 1
+	fi
+	
 
 	# Transforms to consistent YYYY-MM-DD format for easier interpretation
 	date_of_file=`echo $date_of_file |
@@ -127,7 +132,7 @@ function get_year_and_month(){
 }
 
 function check_duplicates(){
-    if [ `ls $move_to_dir/$year/"$month" | grep $1 ` ] 
+    if [ `ls $move_to_dir/$year/"$month" | grep $1` ] 
     then
 		# Looks for a number in brackets right before the
 		# . extension
@@ -175,7 +180,8 @@ function copy_files(){
     # lists through files, puts into array
     while [ $i -lt $files_total ];
 	do
-		files[$i]=`ls $watch_dir | sed -n $[$i+1]p `
+
+		files[$i]="$(ls $watch_dir | sed -n $[$i+1]p)"
 		((i++))
     done
     unset i files_total
@@ -184,9 +190,7 @@ function copy_files(){
     # extracts date, creates directories for date if needed,
     # copies, changes privilegdes, writes to log,
     # deletes everyithing in watch_dir
-    for file in ${files[@]}; do
-
-
+    for file in "${files[@]}"; do
 		# Skips if file has same name as $error_warn
 		check_if_error_log $file
 		if [[ $file_is_error_log = 1 ]]
@@ -195,7 +199,7 @@ function copy_files(){
 		fi
 
 		# function sets $year and $month according to file
-		get_year_and_month $watch_dir/$file
+		get_year_and_month "$watch_dir/$file"
 
 
 		
@@ -217,11 +221,10 @@ function copy_files(){
 		fi
 
 		# copies, if error prints log and exits with 1
-		if cp --preserve=all -r $watch_dir/"$file" $move_to_dir/$year/"$month"/"$new_file_name"
+		if cp --preserve=all -r "$watch_dir/$file" "$move_to_dir/$year/$month/$new_file_name"
 		then
 			chown  $own_user:$own_group \
    				   $move_to_dir/$year/"$month"/"$new_file_name"
-			#			chmod  -x  $move_to_dir/$year/"$month"/"$new_file_name"
 
 			echo "msg: copied $file to storage directory" \
 				 >> $log
@@ -240,8 +243,6 @@ function rotate_trash(){
 
     i=0
 
-	echo $i
-	echo $trash_dir_total
     # lists through files, puts into array
     while [ $i -lt $trash_dir_total ]
 	do
@@ -252,7 +253,6 @@ function rotate_trash(){
     for dir in ${trash_dirs[@]}; do
 		if [[ $dir < $(expr $(date +%s) - $trash_interval) ]]
 		then
-			echo $dir
 			rm -rf "$trash_dir/$dir"
 		fi
     done
