@@ -3,10 +3,9 @@
 # Originally meant for photo storage
 
 # TODO create an install.sh file (interactive and not)
-# TODO more verbose move / cp checking.
 # TODO add ability to control fate of duplicates
-
-
+# TOOD start basing where to put directories based on the contents inside,
+#      rather than their stat output.
 # Checks if all variables are properly assigned
 function init_check(){
 	# watch_dir exists and is writable
@@ -65,7 +64,9 @@ function init_check(){
 
 # Simplifies writing to error log
 function print_to_error(){
-	echo $1 >> /dev/stderr >> $error_warn >> $log
+	echo $1 >> /dev/stderr 
+	echo $1 >> $error_warn
+	echo $1 >> $log
 }
 
 # Sets new_file_exists to 1 if new file is detected
@@ -132,44 +133,76 @@ function get_year_and_month(){
 }
 
 function check_duplicates(){
+	# If there exists a file with the same name as in watch_dir
     if [ `ls $move_to_dir/$year/"$month" | grep $1` ] 
     then
-		# Looks for a number in brackets right before the
-		# . extension
-		old_dup_number=`echo $1 | 
-						sed -n -E 's/.*\(([0-9])\)\.[a-z]*$/\1/p'`
+		# If "x" followed by ".format"
+		if [[ "$1" =~ .*\.[a-z]+ ]]
+		then
+			# Looks for a number in brackets right before the
+			# . extension
+			old_dup_number=$(echo $1 |
+								 sed -n -E 's/.*\(([0-9]+)\)\.[a-z]*$/\1/p')
+		else
+			old_dup_number=$(echo $1 |
+								 sed -n -E 's/\(([0-9]+)\)$/\1/p')
+			no_dot_extension=1
+		fi
 
 		# If it can't find a "(x)", inserts it's own (1)
 		if [[ -z $old_dup_number ]]
 		then
 			# Inserts (1) into filename
-			new_file_name=`echo $1 | 
-			   sed -E "s/(\.[a-z]*$)/(1)\1/"`	
+			if [[ $no_dot_extension = 1 ]]
+			then
+				new_file_name=$(echo $1 |
+									sed -E 's/$/(1)/')
+			else
+				new_file_name=$(echo $1 | 
+							   sed -E "s/(\.[a-z]*$)/(1)\1/")
+			fi
 		else
 			old_dup_number=$(echo $old_dup_number | sed 's/^0//')
 			new_dup_number=$[$old_dup_number+1]
+
+			if [[ $no_dot_extension = 1 ]]
+			then
+				new_file_name=$(echo $1 |
+									sed -E "s/\(0-9\)$/($new_dup_number)/")
+			else
 			# Since filename already has (x), adds to it and inserts
 			# into filename
 			new_file_name=`echo $1 | 
 			   sed -E "s/\([0-9]\)(\.[a-z]*)$/($new_dup_number)\1/"`
+			fi
 		fi
 
     fi
-
-	unset old_dup_number new_dup_number
+	unset old_dup_number new_dup_number no_dot_extension
 }
 
-# Checks if watch_directory has the error log ($error_warn),
+# Checks if the passed filename matches the error log name
 # sets file_is_error_log
 function check_if_error_log(){
-    # extracts name of error log file
-    if [[ $1 = `echo $error_warn | 
-	            sed -E 's|.*\/(.*)$|\1|'` ]]
+    if [[ "$watch_dir/$1" =  $error_warn ]]
     then
 		file_is_error_log=1
-    else
+	else
 		file_is_error_log=0
-    fi
+	fi
+}
+
+# Checks if passed file name is the error log ($error_warn),
+# sets $file_is_log
+function check_if_log(){
+	if [[ "watch_dir/$1" = $log ]]
+	then
+		# message
+		echo "detected"
+		file_is_log=1
+	else
+		file_is_log=0
+	fi
 }
 
 # Copies only desired files from watch to move
@@ -195,8 +228,18 @@ function copy_files(){
 		check_if_error_log $file
 		if [[ $file_is_error_log = 1 ]]
 		then
+			error_log_in_watch_dir=1
 			continue
 		fi
+
+		check_if_log $file
+		if [[ $file_is_log = 1 ]]
+		then
+			log_in_watch_dir=1
+			continue
+		fi
+		
+		
 
 		# function sets $year and $month according to file
 		get_year_and_month "$watch_dir/$file"
@@ -212,6 +255,7 @@ function copy_files(){
 				check_duplicates $file
 			else
 				mkdir $move_to_dir/$year/"$month"
+				
 				echo made $move_to_dir/$year/"$month" >> $log
 
 			fi
@@ -226,6 +270,7 @@ function copy_files(){
 			chown  $own_user:$own_group \
    				   $move_to_dir/$year/"$month"/"$new_file_name"
 
+
 			echo "msg: copied $file to storage directory" \
 				 >> $log
 		else
@@ -233,8 +278,9 @@ function copy_files(){
 			print_to_error $error_msg
 			exit 1
 		fi
+
+		move_to_trash "$file"
     done
-    move_watch_to_trashcan
 }
 
 function rotate_trash(){
@@ -256,33 +302,57 @@ function rotate_trash(){
 			rm -rf "$trash_dir/$dir"
 		fi
     done
-    
 }
 
-# Moves everything in the watch directory to the specified trash location
-function move_watch_to_trashcan(){
+# Moves passed file to trash
+function move_to_trash(){
 	# Makes timestamp for trash collection
-    timestamp="$(date +%s)"
+	if [[ $trash_dir_created != 1 ]]
+	then
+		timestamp="$(date +%s)"
+		rotate_trash $timestamp
+		mkdir $trash_dir/$timestamp
+		trash_dir_created=1
+	fi
+	   
+    if ! mv "$watch_dir/$1" $trash_dir/$timestamp 
+	then
+		print_to_error "error: failed to move $1 to trash."
+		exit 1
+	fi
 
-    rotate_trash $timestamp
+	if [[ $file_is_error_log = 1 ]]
+	then
+		erlog_name=$(echo $error_warn | sed -E 's|.*\/(.*)$|\1|')
+		mv $trash_dir/$timestamp/$erlog_name $watch_dir
+	fi
 
-    mkdir $trash_dir/$timestamp
-    mv $watch_dir/* $trash_dir/$timestamp
-
-    echo $(date +%s) >> $trash_dir/.timestamp
-    
+	if [[ $file_is_log = 1 ]]
+	then
+		# message
+		echo "detected"
+		log_name=$(echo $log | sed -E 's|.*\/(.*)$|\1|')
+		mv $trash_dir/$timestamp/$log_name $watch_dir
+	fi
 }
 
 
 # Main script
-
 if ! source /home/meetowl/program/dirwatch//dirwatch.conf 
 then
-    echo "error: configuration file corrupted or missing"
+    echo "error: configuration file corrupted or missing."
     exit 1
 fi
 
 init_check
+
+if [[ -f $error_warn ]]
+then
+	print_to_error "error: error file $error_warn exists and error may have occurred last run, delete file to continue regular usage."
+	exit 1
+fi
+
+
 
 detect_new_file
 if [[ $new_file_exists = 1 ]]

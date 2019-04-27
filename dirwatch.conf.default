@@ -5,12 +5,15 @@ watch_dir=
 ## Directory to sort files into
 move_to_dir=
 
+## Directory for trash files
+trash_dir=
+# Delete trash older than x seconds
+# Currently at two weeks
+trash_interval=1209600
+
 ## Location of log and error warning files
 log=
 error_warn=
-
-## Interval for checking watch_dir
-interval=
 
 ## User and group ownership
 own_user=
