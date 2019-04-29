@@ -129,6 +129,8 @@ function get_year_and_month(){
 
 	month=`echo $date_of_file | 
 		   sed -E 's/.+-([0-9]{2})-.+/\1/'`
+	month=$(echo $month |
+				sed -E 's/^0([1-9]+)$/\1/')
 	month=${month_to_name_array[$[$month]]}
 }
 
@@ -240,11 +242,8 @@ function copy_files(){
 		fi
 		
 		
-
 		# function sets $year and $month according to file
 		get_year_and_month "$watch_dir/$file"
-
-
 		
 		# if year/month directories don't exist, create them
 		if [[ -d $move_to_dir/$year ]]
