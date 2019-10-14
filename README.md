@@ -1,6 +1,6 @@
 ## dirwatch.sh 
 The idea behind this is to have a simpler time with self-organized 
-photo storage, where you have a dedicated file used for dropping in random 
+photo storage, where you have a dedicated directory used for dropping in random 
 pictures that you want to save in a hierarchial directory structure ordered 
 by Year/Month
 <br>
