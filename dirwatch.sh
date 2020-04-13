@@ -264,11 +264,11 @@ function copy_files(){
 		fi
 
 		# copies, if error prints log and exits with 1
-		if cp --preserve=all -r "$watch_dir/$file" "$move_to_dir/$year/$month/$new_file_name"
+		if cp --preserve=timestamps -r "$watch_dir/$file" "$move_to_dir/$year/$month/$new_file_name"
 		then
 			chown  $own_user:$own_group \
    				   $move_to_dir/$year/"$month"/"$new_file_name"
-
+			chmod 770 $move_to_dir/$year/"$month"/"$new_file_name"
 
 			echo "msg: copied $file to storage directory" \
 				 >> $log
